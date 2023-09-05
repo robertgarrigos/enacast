@@ -1,0 +1,17 @@
+type = module
+name = Enacast
+description = Implements services by Enacast podcast service.
+backdrop = 1.x
+
+; Link to the module's configuration page.
+configure = admin/config/media/enacast
+
+; Add custom CSS & JS files.
+stylesheets[all][] = css/enacast.css
+scripts[] = js/enacast.js
+
+; List any dependencies here.
+
+; Find suggested packages and tags at: https://docs.backdropcms.org/documentation/module-packages-and-tags
+package = Media
+tags[] = Podcast

@@ -1,0 +1,294 @@
+<?php
+
+/**
+ * @file
+ * Implements fields and functionalities for Enacast podcast service.
+ */
+
+/**
+ * Implements hook_config_info().
+ */
+function enacast_config_info() {
+  return array(
+    'enacast.settings' => array(
+      'label' => t('Enacast settings'),
+      'group' => t('Configuration'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function enacast_menu() {
+
+  $items['admin/config/services/enacast'] = array(
+    'title' => 'Enacast',
+    'description' => 'Settigns for Enacast services.',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('enacast_settings_form'),
+    'access arguments' => array('administer enacast'),
+    'file' => 'enacast.admin.inc',
+    'weight' => -15,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function enacast_permission() {
+  return array(
+    'administer enacast' => array(
+      'title' => t('Administer Enacast'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_info().
+ */
+function enacast_field_info() {
+  return array(
+    'enacast_program' => array(
+      'label' => t('Enacast program'),
+      'description' => t('Machine name of the Enacast program.'),
+      'instance_settings' => array(
+        'text_processing' => 0,
+        'allowed_formats' => array(),
+      ),
+      'default_widget' => 'text_textfield',
+      'default_formatter' => 'enacast_text',
+    ),
+    'enacast_radio' => array(
+      'label' => t('Enacast radio station'),
+      'description' => t('Machine name of the Enacast radio station.'),
+      'instance_settings' => array(
+        'text_processing' => 0,
+        'allowed_formats' => array(),
+      ),
+      'default_widget' => 'text_textfield',
+      'default_formatter' => 'enacast_text',
+    ),
+    'enacast_podcast' => array(
+      'label' => t('Enacast podcast pk id'),
+      'description' => t('Pk id of the Enacast podcast.'),
+      'instance_settings' => array('min' => '-2147483647', 'max' => '2147483647', 'prefix' => '', 'suffix' => ''),
+      'default_widget' => 'number',
+      'default_formatter' => 'number_integer',
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_validate().
+ */
+function enacast_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+  foreach ($items as $delta => $item) {
+    if (!empty($item['enacast_program'])) {
+      if (!preg_match('/\s/', $item['enacast_program'])) {
+        $errors[$field['field_name']][$langcode][$delta][] = array(
+          'error' => 'enacast_invalid',
+          'message' => t('Program name must not containt white spaces.'),
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function enacast_field_is_empty($item, $field) {
+  return empty($item['value']);
+}
+
+/**
+ * Implements hook_field_formatter_info_alter().
+ */
+function enacast_field_formatter_info_alter(&$info) {
+  $info['text_plain']['field types'][] = 'enacast_program';
+  $info['text_plain']['field types'][] = 'enacast_radio';
+  $info['number_integer']['field types'][] = 'enacast_podcast';
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function enacast_field_formatter_info() {
+  return array(
+    'enacast_last_podcast_player' => array(
+      'label' => t('Last podcast player'),
+      'field types' => array('enacast_program'),
+    ),
+    'enacast_podcast_player' => array(
+      'label' => t('Podcast player'),
+      'field types' => array('enacast_podcast'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function enacast_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $config = config('enacast.settings');
+  $element = array();
+
+  switch ($display['type']) {
+    case 'enacast_text':
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array('#markup' => strip_tags($item['value']));
+      }
+      break;
+
+    case 'enacast_last_podcast_player':
+      if ($config->get('radio') == '') {
+        backdrop_set_message(t('You need to configure the Enacast module in order to show any player: !link.', array('!link' => l('Enacast settings', 'admin/config/services/enacast'))), 'error');
+      }
+      foreach ($items as $delta => $item) {
+        $program = $item['value'];
+        $radio = $config->get('radio');
+        $url = "https://enacast.com/api/v3/podcast/?format=json&page=1&page_size=1&program=" . $program . "&radio=" . $radio;
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        // curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+        if (!empty($post)) {
+          curl_setopt($ch, CURLOPT_POST, TRUE);
+          curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+        }
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $return_data = curl_exec($ch);
+
+        if (stristr($return_data, 'Access denied')) {
+          return FALSE;
+        }
+        $data = backdrop_json_decode($return_data);
+        // dpm($data);
+
+        $variables = array(
+          'mp3_url' => $data['results'][0]['audio'],
+          'title' =>  $data['results'][0]['name'],
+          'summary' =>  $data['results'][0]['summary'],
+        );
+        $output = theme('enacast_last_podcast', $variables);
+        $element[$delta] = array('#markup' => $output);
+      }
+      break;
+
+    case 'enacast_podcast_player':
+      if ($config->get('radio') == '') {
+        backdrop_set_message(t('You need to configure the Enacast module in order to show any player: !link.', array('!link' => l('Enacast settings', 'admin/config/services/enacast'))), 'error');
+      }
+      foreach ($items as $delta => $item) {
+        $podcast = $item['value'];
+        $radio = $config->get('radio');
+        $url = "https://enacast.com/" . $radio . "/play_podcast/" . $podcast . ".mp3";
+        $variables = array(
+          'mp3_url' => $url,
+        );
+        $output = theme('enacast_podcast', $variables);
+        $element[$delta] = array('#markup' => $output);
+      }
+      break;
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_field_widget_info_alter().
+ */
+function enacast_field_widget_info_alter(&$info) {
+  $info['text_textfield']['field types'][] = 'enacast_program';
+  $info['text_textfield']['field types'][] = 'enacast_radio';
+  $info['number']['field types'][] = 'enacast_podcast';
+}
+
+/**
+ * Implements hook_theme().
+ */
+function enacast_theme($existing, $type, $theme, $path) {
+  return array(
+    'enacast_last_podcast' => array(
+      'variables' => array(
+        'mp3_url' => NULL,
+        'title' => NULL,
+        'summary' => NULL,
+      ),
+      'template' => 'templates/enacast-last-podcast',
+    ),
+    'enacast_podcast' => array(
+      'variables' => array(
+        'mp3_url' => NULL,
+      ),
+      'template' => 'templates/enacast-podcast',
+    ),
+    'enacast_now_playing_block' => array(
+      'variables' => array(
+        'radio' => NULL,
+      ),
+      'template' => 'templates/enacast-now-playing-block',
+    ),
+  );
+}
+
+
+/**
+ * Implements hook_block_info().
+ */
+function enacast_block_info() {
+
+  $blocks['enacast_now_playing'] = array(
+    'info' => t('Enacast now playing block'),
+    'description' => 'This is block is configurable.',
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function enacast_block_configure($delta = '', $settings = array()) {
+  $form = array();
+  if ($delta == 'enacast_now_playing') {
+    $settings += array(
+      'radio' => '',
+    );
+    $form['radio'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Radio'),
+      '#size' => 60,
+      '#description' => t('Radio to show the now playing block from.'),
+      '#default_value' => $settings['radio'],
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function enacast_block_view($delta = '', $settings = array(), $contexts = array()) {
+  switch ($delta) {
+    case 'enacast_now_playing':
+      $block['subject'] = t('Now playing');
+      $block['content'] = array(
+        '#markup' => theme('enacast_now_playing_block', $settings),
+      );
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Preprocess function for theme_enacast_now_playing_block().
+ */
+function enacast_preprocess_enacast_now_playing_block(&$variables) {
+  $variables['source'] = 'https://relay.stream.enacast-cloud.com:30230/' . $variables['radio'] . 'HD.mp3';
+}

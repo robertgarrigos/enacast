@@ -1,0 +1,46 @@
+<?php
+/**
+ * @file
+ * Install, update, and uninstall functions for the Enacast module.
+ */
+
+/**
+ * Implements hook_field_schema().
+ *
+ */
+function enacast_field_schema($field) {
+
+  switch ($field['type']) {
+    case 'enacast_program' :
+      $columns = array(
+        'value' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => FALSE
+        ),
+      );
+      break;
+
+      case 'enacast_radio' :
+        $columns = array(
+          'value' => array(
+            'type' => 'varchar',
+            'length' => 255,
+            'not null' => FALSE
+          ),
+        );
+        break;
+
+    case 'enacast_podcast' :
+      $columns = array(
+        'value' => array(
+          'type' => 'int',
+          'not null' => FALSE
+        ),
+      );
+      break;
+  }
+  return array(
+    'columns' => $columns,
+  );
+}
