@@ -4,7 +4,7 @@ description = Implements services by Enacast podcast service.
 backdrop = 1.x
 
 ; Link to the module's configuration page.
-configure = admin/config/media/enacast
+configure = admin/config/services/enacast
 
 ; Add custom CSS & JS files.
 stylesheets[all][] = css/enacast.css
