@@ -26,7 +26,7 @@
 ?>
 <div class="podcast">
 
-    <audio controls>
+    <audio id="enacast-podcast" controls>
       <source src="<?php print $mp3_url; ?>" type="audio/mpeg">
       Your browser does not support the audio tag.
     </audio>

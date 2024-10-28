@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Install, update, and uninstall functions for the Enacast module.
@@ -6,12 +7,11 @@
 
 /**
  * Implements hook_field_schema().
- *
  */
 function enacast_field_schema($field) {
 
   switch ($field['type']) {
-    case 'enacast_program' :
+    case 'enacast_program':
       $columns = array(
         'value' => array(
           'type' => 'varchar',
@@ -21,17 +21,17 @@ function enacast_field_schema($field) {
       );
       break;
 
-      case 'enacast_radio' :
-        $columns = array(
-          'value' => array(
-            'type' => 'varchar',
-            'length' => 255,
-            'not null' => FALSE
-          ),
-        );
-        break;
+    case 'enacast_radio':
+      $columns = array(
+        'value' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => FALSE
+        ),
+      );
+      break;
 
-    case 'enacast_podcast' :
+    case 'enacast_podcast':
       $columns = array(
         'value' => array(
           'type' => 'int',
@@ -43,4 +43,121 @@ function enacast_field_schema($field) {
   return array(
     'columns' => $columns,
   );
+}
+
+
+/**
+ * Implementation of hook_schema().
+ */
+function enacast_schema() {
+  $schema['enacast_podcasts'] = array(
+    'description' => 'Base table for podcasts imported by Enacast',
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'id'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pkid'=> array(
+        'type'=> 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'name'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'summary'=> array(
+        'type'=> 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+      'audio'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'program_codename'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'program_name'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'radio_codename'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'radio_name'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'utc_datetime'=> array(
+        'type'=> 'datetime',
+        'not null' => TRUE,
+      ),
+      'datetime_tz'=> array(
+        'type'=> 'datetime',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id'),
+  );
+  $schema['enacast_markers'] = array(
+    'description' => 'Markers for Enacasts podcasts',
+    'fields' => array(
+      'pid'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pkid'=> array(
+        'type'=> 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'mid'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'descr'=> array(
+        'type'=> 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'startsecond' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('mid'),
+  );
+  return $schema;
 }
