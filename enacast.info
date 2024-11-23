@@ -11,6 +11,7 @@ stylesheets[all][] = css/enacast.css
 scripts[] = js/enacast.js
 
 ; List any dependencies here.
+dependencies[] = prepopulate
 
 ; Find suggested packages and tags at: https://docs.backdropcms.org/documentation/module-packages-and-tags
 package = Media
