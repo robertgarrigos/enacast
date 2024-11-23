@@ -5,10 +5,17 @@
  * Administrative page callbacks for the Enacast module.
  */
 
-//TODO: Document functions
 
 /**
- * Enacast configuration form.
+ * Form builder for Enacast settings.
+ *
+ * @param array $form
+ *   An associative array containing the initial structure of the form.
+ * @param array &$form_state
+ *   An associative array containing the current state of the form.
+ *
+ * @return array
+ *   The form structure.
  */
 function enacast_settings_form($form, &$form_state) {
   $form['#config'] = 'enacast.settings';
@@ -20,10 +27,10 @@ function enacast_settings_form($form, &$form_state) {
     '#title' => t('Type of site'),
     '#default_value' => $config->get('type_of_site'),
     '#options' => array(
-      'radio' => t('radio'),
-      'program' => t('program'),
+      'radio' => t('Radio'),
+      'program' => t('Program'),
     ),
-    '#description' => t('Whether this is a Radio station website (nodes for programmes and podcasts) or a Program website (nodes for podcasts).'),
+    '#description' => t('Specify if this is a Radio station website (nodes for programmes and podcasts) or a Program website (nodes for podcasts).'),
   );
 
   $form['radio'] = array(
@@ -61,14 +68,12 @@ function enacast_settings_form($form, &$form_state) {
     '#description' => t('Node type to act as program node.'),
   );
   if ($config->get('program_type') != 'none') {
-
-    // Enacast program field for programmes
     $program_instances = field_info_instances('node', $config->get('program_type'));
-    $check = FALSE;
-    foreach ($program_instances as $key => $value) {
-      $field = field_info_field($value['field_name']);
+    $has_program_field = FALSE;
+    foreach ($program_instances as $key => $instance) {
+      $field = field_info_field($instance['field_name']);
       if ($field['type'] == 'enacast_program') {
-        $check = TRUE;
+        $has_program_field = TRUE;
         $config->set('program_field', $field['field_name']);
         $form['program_field'] = array(
           '#type' => 'textfield',
@@ -76,13 +81,16 @@ function enacast_settings_form($form, &$form_state) {
           '#default_value' => $config->get('program_field'),
           '#disabled' => TRUE,
         );
+        break;
       }
     }
-    if ($check === FALSE) {
-      backdrop_set_message(t('@type type nodes need to have a "Enacast program" field.', array('@type' => $types[$config->get('program_type')]->name)), 'error');
+    if (!$has_program_field) {
+      backdrop_set_message(
+        t('Content type "@type" needs to have an "Enacast program" field.', array('@type' => $types[$config->get('program_type')]->name)),
+        'error'
+      );
     }
   }
-
 
   $form['podcast_type'] = array(
     '#type' => 'select',
@@ -92,14 +100,13 @@ function enacast_settings_form($form, &$form_state) {
     '#description' => t('Node type to act as podcast node.'),
   );
   if ($config->get('podcast_type') != 'none') {
-
-    // Enacast podcast pk id field for podcasts
     $podcast_instances = field_info_instances('node', $config->get('podcast_type'));
-    $check = FALSE;
-    foreach ($podcast_instances as $key => $value) {
-      $field = field_info_field($value['field_name']);
+    $has_podcast_field = FALSE;
+
+    foreach ($podcast_instances as $key => $instance) {
+      $field = field_info_field($instance['field_name']);
       if ($field['type'] == 'enacast_podcast') {
-        $check = TRUE;
+        $has_podcast_field = TRUE;
         $config->set('podcast_field', $field['field_name']);
         $form['podcast_field'] = array(
           '#type' => 'textfield',
@@ -107,10 +114,15 @@ function enacast_settings_form($form, &$form_state) {
           '#default_value' => $config->get('podcast_field'),
           '#disabled' => TRUE,
         );
+        break;
       }
     }
-    if ($check === FALSE) {
-      backdrop_set_message(t('@type type nodes need to have a "Enacast podcast pk id" field.', array('@type' => $types[$config->get('podcast_type')]->name)), 'error');
+
+    if (!$has_podcast_field) {
+      backdrop_set_message(
+        t('Content type "@type" needs to have an "Enacast podcast PK ID" field.', array('@type' => $types[$config->get('podcast_type')]->name)),
+        'error'
+      );
     }
   }
 
@@ -118,9 +130,10 @@ function enacast_settings_form($form, &$form_state) {
 }
 
 /**
- * Callback page for updating Enacast data into local tables
+ * Callback page for updating Enacast data into local tables.
  *
  * @return array
+ *   A renderable array representing the update content page.
  */
 function enacast_update_content_page() {
   $config = config('enacast.settings');
@@ -136,7 +149,7 @@ function enacast_update_content_page() {
       $row = array($entry->pkid, $entry->name);
       $nid = enacast_get_podcast_node($entry);
       if ($nid) {
-        $row[] = l($nid, 'node/' . $nid);
+        $row[] = l(t('View Node'), 'node/' . $nid);
       } else {
         // TODO: add other node field (date creation as podcast date?...)
         $link_options = array(
@@ -152,27 +165,25 @@ function enacast_update_content_page() {
       $rows[] = $row;
     }
     // Make a table for them.
-    $fields = array(
-      'pkid', 'name', 'node'
+    $header = array(
+      'pkid',
+      'name',
+      'node'
     );
-    // Other fields available in the json
-    // $fields = array(
-    //   'id', 'name', 'summary', 'audio', 'program_codename', 'program_name', 'radio_codename', 'radio_name', 'utc_datetime', 'datetime_tz',
-    // );
     $build['ajax_table_wrapper'] = array(
       '#prefix' => '<div id="ajax-table-wrapper">',
       '#suffix' => '</div>',
-  );
+    );
     $build['ajax_table_wrapper']['table'] = array(
       '#theme' => 'table',
-      '#header' => $fields,
+      '#header' => $header,
       '#rows' => $rows,
       '#caption' => t('Podcasts in Enacast local tables'),
       '#ajax' => array(
         'wrapper' => 'ajax-table-wrapper',
         'effect' => 'fade',
       ),
-      '#attributes'=> array(
+      '#attributes' => array(
         'class' => array('enacast-table'),
       ),
     );
@@ -196,7 +207,7 @@ function enacast_update_content_page() {
  * @see enacast_update_content_page()
  */
 function enacast_update_form($form, &$form_state) {
-  $form['#config'] = 'enacast.settings';
+  // $form['#config'] = 'enacast.settings';
   $config = config('enacast.settings');
 
   $program = $_GET['program'] ? $_GET['program'] : $config->get('program');
@@ -228,7 +239,7 @@ function enacast_update_form($form, &$form_state) {
       '#type' => 'hidden',
       '#value' => 'podcasts',
     );
-    if (($config->get('radio') == '') || ($config->get('program') == '')) {
+    if (empty($config->get('radio')) || empty($config->get('program'))) {
       backdrop_set_message(t('You need to config this module first on !link', array('!link' => l('Enacast settings', 'admin/config/services/enacast'))), 'error');
       $form['update']['submit'] = array(
         '#type' => 'submit',
@@ -239,13 +250,13 @@ function enacast_update_form($form, &$form_state) {
       $form['update']['submit'] = array(
         '#type' => 'submit',
         '#value' => t('Import new podcast data'),
-        '#attributes' => array('class'=>['button-primary']),
+        '#attributes' => array('class' => ['button-primary']),
         '#submit' => array('enacast_update_form_submit'),
       );
       $form['update']['check'] = array(
         '#type' => 'submit',
         '#value' => t('Check json data'),
-        '#attributes' => array('class'=>['button']),
+        '#attributes' => array('class' => ['button']),
         '#submit' => array('enacast_check_form_submit'),
       );
     }
@@ -256,9 +267,9 @@ function enacast_update_form($form, &$form_state) {
   // Show the json data if "Check json data" button was cliked
   if (isset($form_state['storage']['debug_info'])) {
     $form['debug'] = array(
-        '#markup' => '<pre class="enacast-debug-info">' . $form_state['storage']['debug_info'] . '</pre>',
+      '#markup' => '<pre class="enacast-debug-info">' . $form_state['storage']['debug_info'] . '</pre>',
     );
-}
+  }
   return $form;
 }
 
@@ -276,25 +287,37 @@ function enacast_update_form_submit($form, &$form_state) {
   $radio = $form_state['values']['radio'];
   $page = $form_state['values']['page'];
   $import_type = $form_state['values']['import_type'];
+
   if ($import_type == 'podcasts') {
     $url = 'https://enacast.com/api/v3/podcast/?page=' . $page . '&program=' . $program . '&radio=' . $radio;
     $data = enacast_get_json($url);
-    foreach ($data['results'] as $podcast_json) {
-      $podcast_db = enacast_podcast_load($podcast_json['id']);
-      if (!$podcast_db) { //podcast doesn't exist on our database: create it
-        enacast_podcast_insert($podcast_json);
-        foreach ($podcast_json['markers'] as $marker) {
-          enacast_marker_insert($podcast_json, $marker);
+
+    if (!empty($data['results'])) {
+      foreach ($data['results'] as $podcast_json) {
+        $podcast_db = enacast_podcast_load($podcast_json['id']);
+        if (!$podcast_db) {
+          enacast_podcast_insert($podcast_json);
+          if (!empty($podcast_json['markers'])) {
+            foreach ($podcast_json['markers'] as $marker) {
+              enacast_marker_insert($podcast_json, $marker);
+            }
+          }
         }
-      } else { //TODO: podcast does exist on our database: update it?
-        backdrop_set_message(t('Cannot insert already existing podcast @podcast', array('@podcast' => $podcast_db['pkid'])), 'error');
+        else {
+          backdrop_set_message(
+            t('Cannot insert already existing podcast @podcast.', array('@podcast' => $podcast_db['pkid'])),
+            'error'
+          );
+        }
       }
     }
+    else {
+      backdrop_set_message(t('No new podcasts found to import.'), 'status');
+    }
   }
-  $path = parse_url($form['#action']);
-  $path = $path['path'];
+
   $form_state['redirect'] = array(
-    $path,
+    'admin/config/services/enacast/update',
     array(
       'query' => array(
         'p' => $page,
@@ -324,24 +347,38 @@ function enacast_check_form_submit($form, &$form_state) {
     $form_state['storage']['debug_info'] = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
   }
   $form_state['rebuild'] = TRUE;
-
 }
 
 /**
- * Returns enacast podcast data for a given podcast_id if it exists.
+ * Loads Enacast podcast data for a given podcast ID if it exists.
  *
  * @param string $id
- * @return array
+ *   The podcast ID.
+ *
+ * @return array|bool
+ *   An associative array of podcast data or FALSE if not found.
  */
 function enacast_podcast_load($id) {
   $fields = array(
-    'id', 'pkid', 'name', 'summary', 'audio', 'program_codename', 'program_name', 'radio_codename', 'radio_name', 'utc_datetime', 'datetime_tz',
+    'id',
+    'pkid',
+    'name',
+    'summary',
+    'audio',
+    'program_codename',
+    'program_name',
+    'radio_codename',
+    'radio_name',
+    'utc_datetime',
+    'datetime_tz',
   );
-  $select = db_select('enacast_podcasts', 'p');
-  $select->fields('p', $fields);
-  $select->condition('id', $id);
-  $result = $select->execute()->fetchAssoc();
-  return $result;
+  $result = db_select('enacast_podcasts', 'p')
+    ->fields('p', $fields)
+    ->condition('id', $id)
+    ->execute()
+    ->fetchAssoc();
+
+  return $result ?: FALSE;
 }
 
 /**
@@ -353,37 +390,44 @@ function enacast_podcast_load($id) {
  */
 function enacast_podcast_insert($podcast) {
   $fields = array(
-    'id', 'pkid', 'name', 'summary', 'audio', 'program_codename', 'program_name', 'radio_codename', 'radio_name', 'utc_datetime', 'datetime_tz',
+    'id',
+    'pkid',
+    'name',
+    'summary',
+    'audio',
+    'program_codename',
+    'program_name',
+    'radio_codename',
+    'radio_name',
+    'utc_datetime',
+    'datetime_tz',
   );
-  $insert = array();
   $podcast['pkid'] = enacast_get_pkid($podcast);
-  foreach ($fields as $key) {
-    $insert[$key] = $podcast[$key];
-  }
-  $return_value = NULL;
+  $insert_data = array_intersect_key($podcast, array_flip($fields));
+
   try {
-    $return_value = db_insert('enacast_podcasts')
-      ->fields($insert)
+    return db_insert('enacast_podcasts')
+      ->fields($insert_data)
       ->execute();
-  } catch (Exception $e) {
-    backdrop_set_message(t(
-      'db_insert failed. Message = %message, query= %query',
-      array('%message' => $e->getMessage(), '%query' => $e->query_string)
-    ), 'error');
   }
-  return $return_value;
+  catch (Exception $e) {
+    backdrop_set_message(t('Database insert failed: @message', array('@message' => $e->getMessage())), 'error');
+    return NULL;
+  }
 }
 
 /**
- * Insert a marker data for a given podcast and marker into
- * local enacast tables
+ * Inserts marker data for a given podcast into the Enacast local tables.
  *
  * @param array $podcast
+ *   The podcast data array.
  * @param array $marker
- * @return object|null
+ *   The marker data array.
+ *
+ * @return int|null
+ *   The insert ID or NULL on failure.
  */
 function enacast_marker_insert($podcast, $marker) {
-
   $fields = array(
     'pid' => $podcast['id'],
     'pkid' => enacast_get_pkid($podcast),
@@ -391,63 +435,81 @@ function enacast_marker_insert($podcast, $marker) {
     'descr' => $marker['descr'],
     'startsecond' => $marker['startsecond'],
   );
-  $return_value = NULL;
+
   try {
-    $return_value = db_insert('enacast_markers')
+    return db_insert('enacast_markers')
       ->fields($fields)
       ->execute();
-  } catch (Exception $e) {
-    backdrop_set_message(t(
-      'db_insert failed. Message = %message, query= %query',
-      array('%message' => $e->getMessage(), '%query' => $e->query_string)
-    ), 'error');
   }
-  return $return_value;
+  catch (Exception $e) {
+    backdrop_set_message(t('Database insert failed: @message', array('@message' => $e->getMessage())), 'error');
+    return NULL;
+  }
 }
 
 /**
- * Gets a paged set of all Enacast podcasts on local tables
+ * Retrieves a paged set of all Enacast podcasts from local tables.
  *
  * @return array
+ *   An array of podcast objects.
  */
 function enacast_podcasts_get_all() {
   $fields = array(
-    'id', 'pkid', 'name', 'summary', 'audio', 'program_codename', 'program_name', 'radio_codename', 'radio_name', 'utc_datetime', 'datetime_tz',
+    'id',
+    'pkid',
+    'name',
+    'summary',
+    'audio',
+    'program_codename',
+    'program_name',
+    'radio_codename',
+    'radio_name',
+    'utc_datetime',
+    'datetime_tz',
   );
-  $select = db_select('enacast_podcasts', 'p')->extend('PagerDefault');
-  $select->fields('p', $fields)
+  $result = db_select('enacast_podcasts', 'p')
+    ->extend('PagerDefault')
+    ->fields('p', $fields)
     ->limit(10)
-    ->orderBy('p.datetime_tz', 'DESC');
-  $result = $select->execute()->fetchAll();
+    ->orderBy('p.datetime_tz', 'DESC')
+    ->execute()
+    ->fetchAll();
+
   return $result;
 }
 
 /**
- * Returns a podcast pkid
+ * Returns a podcast PK ID extracted from the audio URL.
  *
  * @param array $podcast
+ *   The podcast data array.
+ *
  * @return string
+ *   The extracted PK ID.
  */
 function enacast_get_pkid($podcast) {
-  // dpm($podcast);
-  preg_match('/([.\d]*).mp3/', $podcast['audio'], $matches);
-  return $matches[1];
+  if (preg_match('/([\d\.]+)\.mp3$/', $podcast['audio'], $matches)) {
+    return $matches[1];
+  }
+  return '';
 }
 
 /**
- * Gets the corresponding node of a local podcast
+ * Gets the corresponding node ID of a local podcast.
  *
  * @param object $podcast
- * @return void
+ *   The podcast object.
+ *
+ * @return int|bool
+ *   The node ID if found, FALSE otherwise.
  */
 function enacast_get_podcast_node($podcast) {
-  // gets the corresponding node of a given podcast
   $config = config('enacast.settings');
-  // $podcast_type = $config->get('podcast_type');
-  // dpm($config);
+  $podcast_field = $config->get('podcast_field');
+
   $select = db_select('node', 'n');
-  $select->leftJoin('field_data_' . $config->get('podcast_field'), 'p', 'n.nid=p.entity_id');
+  $select->leftJoin('field_data_' . $podcast_field, 'p', 'n.nid=p.entity_id');
   $select->fields('n', array('nid'));
-  $select->condition('p.' . $config->get('podcast_field') . '_value', $podcast->pkid, '=');
+  $select->condition('p.' . $podcast_field . '_value', $podcast->pkid, '=');
   return $select->execute()->fetchField();
 }
