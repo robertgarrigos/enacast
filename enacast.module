@@ -6,6 +6,13 @@
  */
 
 /**
+ * Implements hook_init().
+ */
+function enacast_init() {
+  backdrop_add_js(backdrop_get_path('module', 'enacast') . '/js/enacast.js', 'file');
+}
+
+/**
  * Implements hook_config_info().
  */
 function enacast_config_info() {
@@ -30,6 +37,23 @@ function enacast_menu() {
     'access arguments' => array('administer enacast'),
     'file' => 'enacast.admin.inc',
     'weight' => -15,
+  );
+
+  $items['admin/config/services/enacast/settings'] = array(
+    'title' => 'Settings',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['admin/config/services/enacast/update'] = array(
+    'title' => 'Update',
+    'description' => 'Update content Enacast services.',
+    'page callback' => 'enacast_update_content_page',
+    // 'page callback' => 'backdrop_get_form',
+    // 'page arguments' => array('enacast_update_form'),
+    'access arguments' => array('administer enacast'),
+    'file' => 'enacast.admin.inc',
+    'type' => MENU_LOCAL_TASK,
   );
 
   return $items;
@@ -151,23 +175,7 @@ function enacast_field_formatter_view($entity_type, $entity, $field, $instance, 
         $program = $item['value'];
         $radio = $config->get('radio');
         $url = "https://enacast.com/api/v3/podcast/?format=json&page=1&page_size=1&program=" . $program . "&radio=" . $radio;
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        // curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
-        if (!empty($post)) {
-          curl_setopt($ch, CURLOPT_POST, TRUE);
-          curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
-        }
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        $return_data = curl_exec($ch);
-
-        if (stristr($return_data, 'Access denied')) {
-          return FALSE;
-        }
-        $data = backdrop_json_decode($return_data);
-        // dpm($data);
+        $data = enacast_get_json($url);
 
         $variables = array(
           'mp3_url' => $data['results'][0]['audio'],
@@ -233,9 +241,15 @@ function enacast_theme($existing, $type, $theme, $path) {
       ),
       'template' => 'templates/enacast-now-playing-block',
     ),
+    'enacast_markers' => array(
+      'variables' => array(
+        'markers' => NULL,
+        'nid' => NULL,
+      ),
+      'template' => 'templates/enacast-markers',
+    ),
   );
 }
-
 
 /**
  * Implements hook_block_info().
@@ -291,4 +305,92 @@ function enacast_block_view($delta = '', $settings = array(), $contexts = array(
  */
 function enacast_preprocess_enacast_now_playing_block(&$variables) {
   $variables['source'] = 'https://relay.stream.enacast-cloud.com:30230/' . $variables['radio'] . 'HD.mp3';
+}
+
+/**
+ * Gets json from a url
+ *
+ * @param string $url
+ * @return mixed
+ */
+function enacast_get_json($url) {
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+  if (!empty($post)) {
+    curl_setopt($ch, CURLOPT_POST, TRUE);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+  }
+  curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+  $return_data = curl_exec($ch);
+
+  if (stristr($return_data, 'Access denied')) {
+    return FALSE;
+  }
+  $data = backdrop_json_decode($return_data);
+  return $data;
+}
+
+/**
+ * Implements hook_node_load().
+ */
+function enacast_node_load($nodes, $types) {
+  $config = config('enacast.settings');
+
+  if (in_array($config->get('podcast_type'), $types)) {
+    foreach ($nodes as $node) {
+      $podcast_field = $config->get('podcast_field');
+      $pkid = $node->$podcast_field['und'][0]['value'];
+      $nodes[$node->nid]->enacast_markers = enacast_get_markers($pkid);
+    }
+  }
+}
+
+/**
+ * Get markers for a given pkid
+ *
+ * @param string|int $pkid
+ * @return array
+ */
+function enacast_get_markers($pkid) {
+  $result = db_select('enacast_markers', 'm')
+    ->fields('m', array('descr', 'startsecond'))
+    ->condition('m.pkid', $pkid, '=')
+    ->orderBy('m.startsecond', 'ASC')
+    ->execute()->fetchAll();
+
+  return $result;
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function enacast_node_view($node, $build_mode = 'full') {
+  $config = config('enacast.settings');
+
+  if ($node->type == $config->get('podcast_type')) {
+    $node->content['enacast_markers'] = array(
+      '#markup' => theme(
+        'enacast_markers',
+        array(
+          'markers' => $node->enacast_markers,
+          'nid' => $node->nid,
+        )
+      ),
+      '#weight' => 10,
+    );
+  }
+}
+
+/**
+ * Implements hook_preprocess_enacast_markers().
+ */
+function enacast_preprocess_enacast_markers(&$variables) {
+  $params = backdrop_get_query_parameters();
+  if (isset($params['s'])) {
+    backdrop_add_js(array('audioPlayer' => array('startTime' => $params['s'])), 'setting');
+  }
+  $variables['share_icon'] = backdrop_get_path('module', 'enacast') . '/images/share-2.svg';
+  $variables['path'] = url('/node/' . $variables['nid']);
 }

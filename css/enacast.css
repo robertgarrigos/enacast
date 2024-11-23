@@ -2,3 +2,25 @@
  * @file
  * Custom CSS for the Enacast module.
  */
+
+.share-icon {
+  width: 2em;
+  height: 2em;
+}
+
+.enacast-debug-info {
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #cccccc;
+  padding: 10px;
+  box-sizing: border-box;
+  font-family: 'Courier New', monospace;
+  background-color: #f5f5f5;
+}
+
+.enacast-table caption{
+  background-color: #444;
+  color: #fff;
+  font-size: 1.5rem;
+}

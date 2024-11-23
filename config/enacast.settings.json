@@ -2,5 +2,7 @@
   "_config_name": "enacast.settings",
   "type_of_site": "radio",
   "radio": "",
-  "program": ""
+  "program": "",
+  "podcast_type": "none",
+  "program_type": "none"
 }
