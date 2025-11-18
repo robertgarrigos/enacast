@@ -199,8 +199,9 @@ function enacast_field_formatter_view($entity_type, $entity, $field, $instance, 
 
       case 'enacast_podcast_player':
         $podcast_id = $item['value'];
+        $start = $item['start'];
         $radio = $config->get('radio');
-        $mp3_url = "https://enacast.com/{$radio}/play_podcast/{$podcast_id}.mp3";
+        $mp3_url = "https://enacast.com/{$radio}/play_podcast/{$podcast_id}.mp3#t={$start}";
         $variables = array('mp3_url' => $mp3_url);
         $element[$delta] = array('#markup' => theme('enacast_podcast', $variables));
         break;
@@ -211,13 +212,57 @@ function enacast_field_formatter_view($entity_type, $entity, $field, $instance, 
 }
 
 /**
+ * Implements hook_field_widget_info().
+ */
+function enacast_field_widget_info() {
+  return array(
+    'enacast_podcast' => array(
+      'label' => 'Enacast podcast',
+      'field types' => array('enacast_podcast'),
+      'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+    ),
+  );
+}
+
+/**
  * Implements hook_field_widget_info_alter().
  */
 function enacast_field_widget_info_alter(&$info) {
   $info['text_textfield']['field types'][] = 'enacast_program';
   $info['text_textfield']['field types'][] = 'enacast_radio';
-  $info['number']['field types'][] = 'enacast_podcast';
+  // $info['number']['field types'][] = 'enacast_podcast';
 }
+
+/**
+ * Implements hook_field_widget_form().
+ */
+function enacast_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  $element += [
+    '#type' => 'fieldset',
+    '#title' => t('Enacast podcast'),
+    '#attributes' => ['class' => ['enacast-wrapper']],
+  ];
+  $element['value'] = [
+    '#type' => 'textfield',
+    '#title' => t('Podcast Pk id'),
+    '#default_value' => isset($items[$delta]['value']) ?? '',
+    '#size' => 20,
+    '#prefix' => '<div class="enacast-pkid">',
+    '#suffix' => '</div>',
+  ];
+
+  $element['start'] = [
+    '#type' => 'number',
+    '#title' => t('Start second'),
+    '#default_value' => isset($items[$delta]['start']) ?? '',
+    '#min' => 0,
+    '#prefix' => '<div class="enacast-start">',
+    '#suffix' => '</div>',
+  ];
+
+  return $element;
+}
+
 
 /**
  * Implements hook_theme().

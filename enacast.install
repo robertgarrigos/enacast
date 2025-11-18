@@ -37,6 +37,11 @@ function enacast_field_schema($field) {
           'type' => 'int',
           'not null' => FALSE
         ),
+        'start' => array(
+          'type' => 'int',
+          'not null' => FALSE,
+          'default' => 0,
+        ),
       );
       break;
   }
@@ -160,4 +165,26 @@ function enacast_schema() {
     'primary key' => array('mid'),
   );
   return $schema;
+}
+
+/**
+ * Add new column "start" to enacast_podcast fields
+ *
+ */
+function enacast_update_1200() {
+  $fields = field_read_fields(array('type' => 'enacast_podcast'));
+  foreach ($fields as $field_name => $field) {
+    $schema = array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+    );
+    if (db_table_exists('field_data_' . $field_name)) {
+      db_add_field('field_data_' . $field_name, 'start', $schema);
+    }
+    if (db_table_exists('field_revision_' . $field_name)) {
+      db_add_field('field_revision_' . $field_name, 'start', $schema);
+    }
+  }
 }
