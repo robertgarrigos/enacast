@@ -24,3 +24,12 @@
   color: #fff;
   font-size: 1.5rem;
 }
+
+.enacast-wrapper .fieldset-wrapper {
+  display: flex;
+  gap: 1em;
+}
+
+.enacast-wrapper .fieldset-wrapper>div {
+  flex: 1 0 auto;
+}
